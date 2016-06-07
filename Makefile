@@ -13,12 +13,12 @@ CFLAGS = -Wall -g -O3 -std=c++11
 
 # define any directories containing header files other than /usr/include
 #
-INCLUDES = -I/Users/hobu/pdal-build/include -I/usr/local/include -I.
+INCLUDES = -I. -I/usr/include/jsoncpp/ -I/usr/include
 
 # define library paths in addition to /usr/lib
 #   if I wanted to include libraries not in /usr/lib I'd specify
 #   their path using -Lpath, something like:
-LFLAGS = -L/Users/hobu/pdal-build/lib -L/usr/local/lib
+LFLAGS = -L/usr/lib
 
 # define any libraries to link into executable:
 #   if I want to link in libraries (libx.so or libx.a) I use the -llibname
@@ -67,4 +67,6 @@ clean:
 depend: $(SRCS)
 	makedepend $(INCLUDES) $^
 
+install:
+	cp $(MAIN) /usr/bin
 # DO NOT DELETE THIS LINE -- make depend needs it
