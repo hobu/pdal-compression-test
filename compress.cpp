@@ -132,7 +132,6 @@ int main(int argc, char* argv[])
     Json::Value stats;
     stats["read_time"] = read_time;
     stats["count"] = count;
-    stats["filename"] = filename;
     stats["size"] = static_cast<Json::UInt>(table.m_buf.size());
 
     // check laz-perf
@@ -155,6 +154,7 @@ int main(int argc, char* argv[])
     json["lzma"] = lzma_stats;
     json["lazperf"] = lazperf_stats;
     json["stats"] = stats;
+    json["Filename"] = filename;
 
     std::cout << json << std::endl;
     return 0;
