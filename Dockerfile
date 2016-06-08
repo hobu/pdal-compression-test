@@ -11,5 +11,6 @@ RUN apt-get update && apt-get install -y --fix-missing --no-install-recommends \
 
 
 RUN git clone https://github.com/hobu/pdal-compression-test.git \
-    && cd /pdal-compression-test
-#	&& make \
+    && cd /pdal-compression-test \
+	&& make \
+	&& make install

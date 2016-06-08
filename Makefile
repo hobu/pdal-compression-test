@@ -13,17 +13,17 @@ CFLAGS = -Wall -g -O3 -std=c++11
 
 # define any directories containing header files other than /usr/include
 #
-INCLUDES = -I. -I/usr/include/jsoncpp/ -I/usr/include
+INCLUDES = -I. -I/usr/include/jsoncpp/ -I/usr/include -I/usr/local/include -I/Users/hobu/pdal-build/include
 
 # define library paths in addition to /usr/lib
 #   if I wanted to include libraries not in /usr/lib I'd specify
 #   their path using -Lpath, something like:
-LFLAGS = -L/usr/lib
+LFLAGS = -L/usr/lib -L/Users/hobu/pdal-build/lib -L/usr/local/lib
 
 # define any libraries to link into executable:
 #   if I want to link in libraries (libx.so or libx.a) I use the -llibname
 #   option, something like (this will link in libmylib.so and libm.so:
-LIBS = -lpdalcpp -llzma -ljsoncpp
+LIBS = -lpdalcpp -llzma -ljsoncpp -llaszip
 
 # define the C source files
 SRCS = compress.cpp

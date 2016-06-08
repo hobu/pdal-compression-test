@@ -12,7 +12,7 @@ public:
     {
         compstrm = LZMA_STREAM_INIT;
         decompstrm = LZMA_STREAM_INIT;
-        initCompressor(mode);
+        initCompressor(2);
         initDecompressor();
     }
 

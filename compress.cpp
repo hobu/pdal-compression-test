@@ -6,10 +6,22 @@
 
 #include <pdal/PointTable.hpp>
 #include <pdal/PointView.hpp>
+#include <pdal/LasWriter.hpp>
+#include <pdal/BufferReader.hpp>
 #include <pdal/PipelineManager.hpp>
 #include <pdal/Compression.hpp>
 
+#include <sys/stat.h>
+#include <cstdio>
+
 #include "pdal-lzma.hpp"
+
+size_t getFileSize(const std::string& filename)
+{
+    struct stat st;
+    stat(filename.c_str(), &st);
+    return st.st_size;
+}
 
 std::chrono::high_resolution_clock::time_point now()
 {
@@ -23,11 +35,44 @@ int microsecondsSince(const std::chrono::high_resolution_clock::time_point start
 }
 
 
+std::vector<std::string> splitpath(
+  const std::string& str
+  , const std::set<char> delimiters)
+{
+	// http://stackoverflow.com/questions/8520560/get-a-file-name-from-a-path
+	std::vector<std::string> result;
+
+	char const* pch = str.c_str();
+	char const* start = pch;
+	for(; *pch; ++pch)
+	{
+		if (delimiters.find(*pch) != delimiters.end())
+		{
+			if (start != pch)
+			{
+				std::string str(start, pch);
+				result.push_back(str);
+			}
+			else
+			{
+				result.push_back("");
+			}
+			start = pch + 1;
+		}
+	}
+	result.push_back(start);
+
+	return result;
+}
+
+
 class PointTable : public pdal::StreamPointTable
 {
 public:
-    PointTable(pdal::point_count_t capacity) : pdal::StreamPointTable(m_layout),
-        m_capacity(capacity)
+    PointTable(pdal::point_count_t capacity)
+		: pdal::StreamPointTable(m_layout)
+		, m_count(0)
+        , m_capacity(capacity)
     {}
 
     virtual void finalize()
@@ -38,11 +83,18 @@ public:
             m_buf.resize(pointsToBytes(m_capacity + 1));
         }
     }
-
+    virtual pdal::PointId addPoint()
+	{
+		if (m_count == m_capacity)
+			return m_capacity;
+		else
+			return m_count++;
+	}
     pdal::point_count_t capacity() const
         { return m_capacity; }
 
     std::vector<char> m_buf;
+	pdal::point_count_t m_count;
 
 protected:
     virtual char *getPoint(pdal::PointId idx)
@@ -61,12 +113,14 @@ std::vector<char> lazperf(std::vector<char>& raw, pdal::PointViewPtr view, size_
     size_t pointSize = view->layout()->pointSize();
     std::vector<char> output;
     pdal::SignedLazPerfBuf buffer(output);
-    pdal::LazPerfCompressor<pdal::SignedLazPerfBuf> compressor(buffer, view->layout()->dimTypes());
+	pdal::DimTypeList types = view->layout()->dimTypes();
+    pdal::LazPerfCompressor<pdal::SignedLazPerfBuf> compressor(buffer, types);
 
-    std::vector<char> pt(pointSize);
+	char* position = raw.data();
     for (auto i = 0; i < pointCount; ++i)
     {
-        compressor.compress(raw.data() + (i * pointSize), pointSize);
+        compressor.compress(position, pointSize);
+		position = position + pointSize;
     }
     compressor.done();
     return output;
@@ -86,10 +140,12 @@ std::vector<int8_t> lzma( const std::vector<char> &input)
 
     l.compress(input, compressed);
 //     l.decompress(compressed, uncompressed);
-
+//
 //     bool eq(true);
+//     bool empty(true);
 //     for (size_t i = 0; i < input.size(); ++i)
 //     {
+//		if (input[0] != 0) empty = false;
 //         if (input[i] != uncompressed[i])
 //         {
 //             eq = false;
@@ -97,6 +153,7 @@ std::vector<int8_t> lzma( const std::vector<char> &input)
 //         }
 //     }
 //     std::cout << "check_equal are equal: " << eq << std::endl;
+//     std::cout << "empty: " << empty << std::endl;
     return compressed;
 }
 
@@ -110,6 +167,31 @@ pdal::PointViewSet read(std::string filename,  PointTable& table)
     manager.execute();
     pdal::PointViewSet views = manager.views();
     return views;
+
+}
+
+std::string writeLaz(const std::string& filename, pdal::PointViewPtr view)
+{
+	std::string tmp;
+	pdal::Utils::getenv("TMPDIR", tmp);
+	std::set<char> delims{'/'};
+
+	std::vector<std::string> path = splitpath(filename, delims);
+	std::string basename =  path.back();
+	std::string laz_filename = tmp+"/"+ basename + ".laz";
+	pdal::Options writerOps;
+    writerOps.add("filename", laz_filename);
+    writerOps.add("compression", true);
+	pdal::LasWriter writer;
+	pdal::BufferReader breader;
+	breader.addView(view);
+    writer.setInput(breader);
+    writer.setOptions(writerOps);
+//
+	pdal::PointTable table2;
+    writer.prepare(table2);
+	writer.execute(table2);
+	return laz_filename;
 
 }
 
@@ -132,7 +214,13 @@ int main(int argc, char* argv[])
     Json::Value stats;
     stats["read_time"] = read_time;
     stats["count"] = count;
-    stats["size"] = static_cast<Json::UInt>(table.m_buf.size());
+    stats["buffer_size"] = (int)table.m_buf.size();
+    stats["file_size"] = (int)getFileSize(filename);
+
+	std::string laz_filename = writeLaz(filename, view);
+
+    stats["laz_size"] = (int)getFileSize(laz_filename);
+	std::remove(laz_filename.c_str());
 
     // check laz-perf
     start = now();
@@ -140,22 +228,23 @@ int main(int argc, char* argv[])
     auto lazperf_time = microsecondsSince(start);
     Json::Value lazperf_stats;
     lazperf_stats["compression_time"] = lazperf_time;
-    lazperf_stats["compressed_size"] =  static_cast<Json::UInt>( compressed.size());
+    lazperf_stats["compressed_size"] =  (int)( compressed.size());
 
     // check lzma
     start = now();
     std::vector<int8_t> lzma_data = lzma(table.m_buf);
     auto lzma_time = microsecondsSince(start);
-
+//
     Json::Value lzma_stats;
     lzma_stats["compression_time"] = lzma_time;
-    lzma_stats["compression_size"] = static_cast<Json::UInt>(lzma_data.size());
-
+    lzma_stats["compression_size"] = (int)(lzma_data.size());
+//
     json["lzma"] = lzma_stats;
     json["lazperf"] = lazperf_stats;
     json["stats"] = stats;
     json["Filename"] = filename;
 
     std::cout << json << std::endl;
+
     return 0;
 }
