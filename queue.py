@@ -8,14 +8,21 @@ import sys
 import subprocess
 import os
 
+def exists(args, filename, table='Compression'):
+    dynamodb = boto3.client("dynamodb", region_name=args.region, endpoint_url=args.endpoint)
+
+    response = dynamodb.get_item(TableName=table, Key={'Filename':{'S':filename}})
+    try:
+        response['Item']
+        return True;
+    except KeyError:
+        return False;
 
 def store(data, args, table='Compression'):
-    dynamodb = boto3.resource("dynamodb", region_name=args.region, endpoint_url=args.endpoint)
+    dynamodb = boto3.client("dynamodb", region_name=args.region, endpoint_url=args.endpoint)
 
-    table = dynamodb.Table(table)
     data = json.loads(data)
-    response = table.put_item(Item=data)
-
+    response = dynamodb.put_item(TableName=table, Item=data)
 
 def compress(filename, args):
 
@@ -33,11 +40,9 @@ def compress(filename, args):
 
 def mp_worker((filename, args)):
     print " Processsing %s" % (filename)
-    try:
+    if not exists(args, filename):
         data = compress(filename, args)
         store(data, args)
-    except:
-        pass
     print " Process %s\tDONE" % filename
 
 def get_files(args):
@@ -60,7 +65,7 @@ def handler(args):
     p = multiprocessing.Pool(args.pool_size)
 
     filenames = get_files(args)
-#     filenames = filenames[0:2]
+    filenames = filenames[0:2]
     p.map(mp_worker, filenames)
 
 if __name__ == '__main__':
