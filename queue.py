@@ -21,8 +21,9 @@ def compress(filename, args):
 
     env = dict(os.environ)
     env['DYLD_LIBRARY_PATH'] = '/Users/hobu/pdal-build/lib/'
-    command = """DYLD_LIBRARY_PATH=/Users/hobu/pdal-build/lib/ /Users/hobu/dev/git/pdal-compression-test/pdal-compression-test %s""" % filename
+#     command = """DYLD_LIBRARY_PATH=/Users/hobu/pdal-build/lib/ /Users/hobu/dev/git/pdal-compression-test/pdal-compression-test %s""" % filename
 
+    command = """pdal-compression-test %s""" % filename
 #     print command
     proc = subprocess.Popen(command, stdout=subprocess.PIPE, env=env, shell=True)
     proc.wait()
@@ -53,14 +54,6 @@ def get_files(args):
     for key in objects:
         filename = 's3://'+o.hostname+'/'+key['Key']
         output.append((filename, args))
-#     output = []
-#     client = boto3.client('s3')
-#     paginator = client.get_paginator('list_objects')
-#     for result in paginator.paginate(Bucket = o.hostname, Prefix=path, Delimiter='/', EncodingType='url'):
-#         print o
-#         for o in result.get('CommonPrefixes'):
-#             output.append((o.get('Prefix'), args))
-#     print 'output len: ', len(output)
     return output
 
 def handler(args):
@@ -68,11 +61,6 @@ def handler(args):
 
     filenames = get_files(args)
     filenames = filenames[0:2]
-
-#     filenames = [('autzen.las', args),
-#                  ('simple.las', args)]
-#     filenames = [('s3://iowa-lidar/IA_LAZlib/02004736.laz', args),
-#                 ('s3://iowa-lidar/IA_LAZlib/02004738.laz', args)]
     p.map(mp_worker, filenames)
 
 if __name__ == '__main__':
