@@ -17,18 +17,25 @@ def exists(args, filename, table='Compression'):
         return True;
     except KeyError:
         return False;
+#
 
 def store(data, args, table='Compression'):
-    dynamodb = boto3.client("dynamodb", region_name=args.region, endpoint_url=args.endpoint)
-
+    dynamodb = boto3.resource("dynamodb", region_name=args.region, endpoint_url=args.endpoint)
+#
+    table = dynamodb.Table(table)
     data = json.loads(data)
-    response = dynamodb.put_item(TableName=table, Item=data)
+    response = table.put_item(Item=data)
+    try:
+        response = table.put_item(Item=data)
+    except:
+        print data
+        raise
 
 def compress(filename, args):
 
     env = dict(os.environ)
     env['DYLD_LIBRARY_PATH'] = '/Users/hobu/pdal-build/lib/'
-#     command = """DYLD_LIBRARY_PATH=/Users/hobu/pdal-build/lib/ /Users/hobu/dev/git/pdal-compression-test/pdal-compression-test %s""" % filename
+#    command = """DYLD_LIBRARY_PATH=/Users/hobu/pdal-build/lib/ /Users/hobu/dev/git/pdal-compression-test/pdal-compression-test %s""" % filename
 
     command = """pdal-compression-test %s""" % filename
 #     print command
@@ -66,6 +73,7 @@ def handler(args):
 
     filenames = get_files(args)
 #     filenames = filenames[0:2]
+#    filenames= [('s3://iowa-lidar/IA_LAZlib/02204732.laz', args),]
     p.map(mp_worker, filenames)
 
 if __name__ == '__main__':
