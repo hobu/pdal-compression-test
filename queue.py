@@ -47,7 +47,7 @@ def get_files(args):
 
     path = o.path.strip('/')
 
-    print path, o.hostname
+#     print path, o.hostname
     client = boto3.client('s3')
     output = []
     objects = client.list_objects(Bucket=o.hostname)['Contents']
