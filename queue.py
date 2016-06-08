@@ -65,7 +65,7 @@ def handler(args):
     p = multiprocessing.Pool(args.pool_size)
 
     filenames = get_files(args)
-    filenames = filenames[0:2]
+#     filenames = filenames[0:2]
     p.map(mp_worker, filenames)
 
 if __name__ == '__main__':
