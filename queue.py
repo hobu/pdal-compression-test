@@ -58,14 +58,22 @@ def get_files(args):
 
 
     path = o.path.strip('/')
+    path = path +'/'
 
+    output = []
 #     print path, o.hostname
     client = boto3.client('s3')
-    output = []
-    objects = client.list_objects(Bucket=o.hostname)['Contents']
-    for key in objects:
-        filename = 's3://'+o.hostname+'/'+key['Key']
-        output.append((filename, args))
+    resource = boto3.resource('s3')
+    paginator = client.get_paginator('list_objects')
+    for result in paginator.paginate(Bucket=o.hostname, Delimiter='/', Prefix=path):
+#         import pdb;pdb.set_trace()
+#         if result.get('CommonPrefixes') is not None:
+
+        if result.get('Contents') is not None:
+            for f in result.get('Contents'):
+                filename = 's3://'+o.hostname+'/'+f['Key']
+                output.append((filename, args))
+
     return output
 
 def handler(args):
